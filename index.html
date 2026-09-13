@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rust Player Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14181a;
+    --panel: #1d2225;
+    --panel-line: #2c3336;
+    --rust: #b5551f;
+    --rust-bright: #d9702e;
+    --hazard: #d4a017;
+    --text: #e8e4da;
+    --text-muted: #8b9088;
+    --online: #7a9a6b;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Ржавые потёки на фоне — единственный "громкий" декоративный элемент страницы */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      repeating-linear-gradient(
+        100deg,
+        transparent 0px,
+        transparent 140px,
+        rgba(181, 85, 31, 0.05) 140px,
+        rgba(181, 85, 31, 0.05) 142px
+      ),
+      radial-gradient(ellipse 600px 900px at 15% -10%, rgba(181, 85, 31, 0.12), transparent 60%),
+      radial-gradient(ellipse 500px 700px at 100% 10%, rgba(212, 160, 23, 0.06), transparent 55%);
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 20px 80px;
+  }
+
+  header {
+    border-left: 4px solid var(--rust);
+    padding-left: 16px;
+    margin-bottom: 40px;
+  }
+
+  h1 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: 0.5px;
+    margin: 0 0 6px;
+    color: var(--text);
+  }
+
+  header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+
+  .search-box {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  #nick-input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    padding: 14px 16px;
+    outline: none;
+  }
+
+  #nick-input:focus {
+    border-color: var(--rust);
+  }
+
+  #search-btn {
+    background: var(--rust);
+    color: #14181a;
+    border: none;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 0 24px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+
+  #search-btn:hover { background: var(--rust-bright); }
+
+  .hint {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin: 0 0 32px;
+  }
+
+  section { margin-bottom: 40px; }
+
+  .section-title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--panel-line);
+    padding-bottom: 8px;
+    margin: 0 0 14px;
+  }
+
+  .match-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    border-left: 3px solid transparent;
+    padding: 12px 14px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .match-row:hover { border-left-color: var(--rust); }
+
+  .match-name { font-size: 14px; color: var(--text); }
+  .match-meta { font-size: 12px; color: var(--text-muted); }
+
+  .empty, .loading, .error {
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 8px 0;
+  }
+
+  .error { color: var(--rust-bright); }
+
+  .history-entry {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--panel-line);
+  }
+  .history-entry:last-child { border-bottom: none; }
+  .history-entry .server-tag { color: var(--hazard); }
+  .history-entry .time { color: var(--text-muted); }
+
+  .server-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-line);
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+
+  .server-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .server-id {
+    font-family: 'Oswald', sans-serif;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .server-count { font-size: 12px; color: var(--online); }
+  .server-updated { font-size: 11px; color: var(--text-muted); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    background: rgba(122, 154, 107, 0.12);
+    border: 1px solid rgba(122, 154, 107, 0.35);
+    color: var(--online);
+    font-size: 12px;
+    padding: 4px 9px;
+  }
+
+  #back-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 0 12px;
+  }
+  #back-btn:hover { color: var(--rust-bright); }
+
+  footer {
+    margin-top: 60px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--panel-line);
+    padding-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Rust Player Tracker</h1>
+    <p>Кто и когда заходил на сервер — поиск по нику</p>
+  </header>
+
+  <section>
+    <div class="search-box">
+      <input id="nick-input" type="text" placeholder="Введите часть ника, минимум 2 буквы" autocomplete="off">
+      <button id="search-btn">Найти</button>
+    </div>
+    <p class="hint">Поиск нечувствителен к регистру. Данные обновляются примерно раз в 5 минут.</p>
+    <div id="search-results"></div>
+  </section>
+
+  <section id="servers-section">
+    <div class="section-title">Сейчас на серверах</div>
+    <div id="servers-list" class="loading">Загрузка...</div>
+  </section>
+
+  <footer>
+    Данные собираются напрямую с игровых серверов по протоколу A2S. SteamID не используется — только ник.
+  </footer>
+</div>
+
+<script>
+  // ЗАМЕНИТЕ на адрес вашего задеплоенного Cloudflare Worker,
+  // например: "https://rust-tracker.ваш-акк.workers.dev"
+  const WORKER_URL = "https://YOUR-WORKER-URL.workers.dev";
+
+  const resultsEl = document.getElementById('search-results');
+  const serversEl = document.getElementById('servers-list');
+  const input = document.getElementById('nick-input');
+  const searchBtn = document.getElementById('search-btn');
+
+  function timeAgo(ts) {
+    if (!ts) return 'нет данных';
+    const diffMs = Date.now() - ts;
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) return 'только что';
+    if (min < 60) return `${min} мин назад`;
+    const hrs = Math.floor(min / 60);
+    if (hrs < 24) return `${hrs} ч назад`;
+    return `${Math.floor(hrs / 24)} дн назад`;
+  }
+
+  async function runSearch() {
+    const query = input.value.trim();
+    if (query.length < 2) {
+      resultsEl.innerHTML = '<div class="hint">Введите минимум 2 буквы.</div>';
+      return;
+    }
+    resultsEl.innerHTML = '<div class="loading">Ищем...</div>';
+    try {
+      const res = await fetch(`${WORKER_URL}/search?nick=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+
+      if (!data.matches.length) {
+        resultsEl.innerHTML = '<div class="empty">Никого с таким ником не встречали.</div>';
+        return;
+      }
+
+      resultsEl.innerHTML = '';
+      data.matches.forEach((m) => {
+        const row = document.createElement('div');
+        row.className = 'match-row';
+        row.innerHTML = `
+          <span class="match-name">${escapeHtml(m.nick)}</span>
+          <span class="match-meta">${m.totalHours} ч всего · был на ${escapeHtml(m.lastServerId || '?')} · ${timeAgo(m.lastSeen)}</span>
+        `;
+        row.addEventListener('click', () => loadHistory(m.nick));
+        resultsEl.appendChild(row);
+      });
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="error">Не удалось загрузить: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function loadHistory(nick) {
+    resultsEl.innerHTML = '<div class="loading">Загружаем историю...</div>';
+    try {
+      const res = await fetch(`${WORKER_URL}/history?nick=${encodeURIComponent(nick)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+
+      const backBtn = document.createElement('button');
+      backBtn.id = 'back-btn';
+      backBtn.textContent = '← назад к результатам поиска';
+      backBtn.addEventListener('click', runSearch);
+
+      resultsEl.innerHTML = '';
+      resultsEl.appendChild(backBtn);
+
+      const title = document.createElement('div');
+      title.className = 'section-title';
+      title.textContent = `История: ${nick}`;
+      resultsEl.appendChild(title);
+
+      const stats = document.createElement('div');
+      stats.className = 'match-meta';
+      stats.style.marginBottom = '14px';
+      stats.textContent = `Всего часов на серверах: ${data.totalHours} · заходов: ${data.sessions}`;
+      resultsEl.appendChild(stats);
+
+      if (!data.history.length) {
+        resultsEl.insertAdjacentHTML('beforeend', '<div class="empty">Записей не найдено.</div>');
+        return;
+      }
+
+      data.history.forEach((h) => {
+        const row = document.createElement('div');
+        row.className = 'history-entry';
+        row.innerHTML = `
+          <span class="server-tag">${escapeHtml(h.serverId)}</span>
+          <span class="time">${new Date(h.ts).toLocaleString('ru-RU')}</span>
+        `;
+        resultsEl.appendChild(row);
+      });
+    } catch (err) {
+      resultsEl.innerHTML = `<div class="error">Не удалось загрузить: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function loadServers() {
+    try {
+      const res = await fetch(`${WORKER_URL}/servers`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка запроса');
+
+      if (!data.length) {
+        serversEl.innerHTML = '<div class="empty">Сервера не настроены.</div>';
+        return;
+      }
+
+      serversEl.innerHTML = '';
+      data.forEach((s) => {
+        const card = document.createElement('div');
+        card.className = 'server-card';
+        const players = s.players || [];
+        card.innerHTML = `
+          <div class="server-card-head">
+            <span class="server-id">${escapeHtml(s.id)}</span>
+            <span class="server-count">${players.length} онлайн</span>
+          </div>
+          <div class="chips">
+            ${players.map((p) => `<span class="chip">${escapeHtml(p)}</span>`).join('') || '<span class="server-updated">никого нет</span>'}
+          </div>
+          <div class="server-updated" style="margin-top:8px;">обновлено ${timeAgo(s.ts)}</div>
+        `;
+        serversEl.appendChild(card);
+      });
+    } catch (err) {
+      serversEl.innerHTML = `<div class="error">Не удалось загрузить: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = String(str ?? '');
+    return div.innerHTML;
+  }
+
+  searchBtn.addEventListener('click', runSearch);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+  loadServers();
+  setInterval(loadServers, 60000);
+</script>
+</body>
+</html>
