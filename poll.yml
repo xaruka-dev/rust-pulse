@@ -1,0 +1,24 @@
+name: Poll Rust Servers
+
+on:
+  schedule:
+    # GitHub гарантирует минимум 5 минут между запусками по cron,
+    # по факту иногда бывают небольшие задержки — это нормально для free-плана
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Poll servers
+        run: node poll.js
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
