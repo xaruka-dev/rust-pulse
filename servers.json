@@ -1,5 +1,5 @@
 [
-  { "id": "Hellis", "host": "connect eu.hellis.gg", "port": 28015 },
+  { "id": "Hellis", "host": "eu.hellis.gg", "port": 28015 },
   { "id": "server-2", "host": "5.6.7.8", "port": 28015 },
   { "id": "server-3", "host": "9.9.9.9", "port": 28016 }
 ]
